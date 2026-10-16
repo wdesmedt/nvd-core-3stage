@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vES BGP Reset Blackhole</title>
+<style>
+:root {
+  --bg: #f5f6f8; --surface: #ffffff; --surface-2: #eef1f5; --text: #18202c; --muted: #5a6577;
+  --line: #cfd6df; --node: #ffffff; --node-stroke: #8a96a8; --fabric: #d7dde5;
+  --blue: #2563eb; --green: #15803d; --red: #dc2626; --amber: #b45309; --violet: #7c3aed; --grey: #8b95a4;
+  --green-bg: #e7f6ec; --red-bg: #fdecec; --amber-bg: #fdf3e2; --grey-bg: #eef0f3;
+  --code-bg: #111827; --code-text: #e5e7eb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131a; --surface: #161d26; --surface-2: #1d2631; --text: #e6ebf2; --muted: #9aa6b8;
+    --line: #334155; --node: #1a2330; --node-stroke: #5d6d84; --fabric: #26313f;
+    --blue: #60a5fa; --green: #4ade80; --red: #f87171; --amber: #fbbf24; --violet: #a78bfa; --grey: #6f7b8c;
+    --green-bg: #12301f; --red-bg: #3a1717; --amber-bg: #3a2a0d; --grey-bg: #222b36;
+    --code-bg: #0a0f15; --code-text: #e5e7eb;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131a; --surface: #161d26; --surface-2: #1d2631; --text: #e6ebf2; --muted: #9aa6b8;
+  --line: #334155; --node: #1a2330; --node-stroke: #5d6d84; --fabric: #26313f;
+  --blue: #60a5fa; --green: #4ade80; --red: #f87171; --amber: #fbbf24; --violet: #a78bfa; --grey: #6f7b8c;
+  --green-bg: #12301f; --red-bg: #3a1717; --amber-bg: #3a2a0d; --grey-bg: #222b36;
+  --code-bg: #0a0f15; --code-text: #e5e7eb;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  display: flex; flex-direction: column; min-height: 100vh;
+}
+code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+header {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+  border-bottom: 1px solid var(--line); background: var(--surface);
+}
+header .brand { font-weight: 650; font-size: 14px; letter-spacing: .01em; }
+header .count { color: var(--muted); font-size: 13px; margin-left: auto; font-variant-numeric: tabular-nums; }
+button {
+  font: inherit; font-size: 13px; color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer;
+}
+button:hover { border-color: var(--node-stroke); }
+button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+button:disabled { opacity: .4; cursor: default; }
+main { flex: 1; display: flex; flex-direction: column; padding: 16px; gap: 12px; max-width: 1400px; width: 100%; margin: 0 auto; }
+section.slide { display: none; flex: 1; }
+section.slide.active { display: flex; }
+footer { display: flex; justify-content: center; gap: 6px; padding: 10px 16px 16px; flex-wrap: wrap; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); border: 0; padding: 0; }
+.dot.on { background: var(--blue); }
+
+/* title */
+#s-title { flex-direction: column; justify-content: center; gap: 20px; max-width: 980px; margin: 0 auto; padding: 24px 0; }
+#s-title .kicker { color: var(--blue); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+#s-title h1 { font-size: clamp(26px, 4vw, 42px); line-height: 1.15; margin: 0; letter-spacing: -.01em; }
+#s-title p.lead { font-size: 18px; color: var(--muted); margin: 0; max-width: 760px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.fact b { display: block; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+
+/* stage */
+#s-stage { gap: 16px; align-items: flex-start; }
+.stage-wrap { flex: 1 1 64%; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 8px; display: flex; }
+.stage-wrap svg { width: 100%; height: auto; display: block; }
+.caption { flex: 1 1 36%; min-width: 280px; display: flex; flex-direction: column; gap: 12px; }
+.caption .step { color: var(--blue); font-weight: 600; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.caption h2 { margin: 0; font-size: 22px; line-height: 1.25; }
+.caption p { margin: 0; color: var(--text); }
+.caption ul { margin: 0; padding-left: 18px; }
+.caption li { margin: 4px 0; }
+.caption .muted { color: var(--muted); }
+.term {
+  background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 10px 12px;
+  font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; margin: 0;
+}
+.term .p { color: #93c5fd; } .term .ok { color: #86efac; } .term .bad { color: #fca5a5; } .term .dim { color: #9ca3af; }
+.cap-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 960px) { #s-stage { flex-direction: column; } .caption { min-width: 0; } }
+
+/* svg styling */
+.fabric { stroke: var(--fabric); stroke-width: 1.2; }
+.access { stroke: var(--node-stroke); stroke-width: 1.6; }
+.node rect.box { fill: var(--node); stroke: var(--node-stroke); stroke-width: 1.4; }
+.node text { fill: var(--text); font-size: 13px; font-weight: 600; }
+.node text.sub { fill: var(--muted); font-size: 10.5px; font-weight: 500; }
+.node.vm rect.box { stroke: var(--violet); stroke-width: 2; }
+.ves rect { fill: var(--surface-2); stroke: var(--violet); stroke-dasharray: 3 2; }
+.ves text { fill: var(--violet); font-size: 9.5px; font-weight: 700; }
+.ves.att rect { fill: var(--green); stroke: var(--green); stroke-dasharray: none; } .ves.att text { fill: #fff; }
+.ves.stale rect { fill: var(--red-bg); stroke: var(--red); stroke-dasharray: none; } .ves.stale text { fill: var(--red); }
+.ves.flash rect { fill: var(--violet); stroke: var(--violet); } .ves.flash text { fill: #fff; }
+.ves-band { fill: var(--violet); fill-opacity: .05; stroke: var(--violet); stroke-width: 1.5; stroke-dasharray: 7 5; stroke-opacity: .75; transition: fill-opacity .5s; }
+.ves-band.pulse { fill-opacity: .18; }
+.ves-label { fill: var(--violet); font-size: 11px; font-weight: 700; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
+.ves-link { fill: none; stroke: var(--violet); stroke-width: 1.5; stroke-dasharray: 2 4; opacity: .85; }
+.nh { opacity: 0; transition: opacity .35s; } .nh.show { opacity: 1; }
+.nh rect { stroke-width: 1.2; } .nh text { font-size: 10px; font-weight: 650; }
+.nh.att rect { fill: var(--green-bg); stroke: var(--green); } .nh.att text { fill: var(--green); }
+.nh.cfg rect { fill: var(--grey-bg); stroke: var(--grey); } .nh.cfg text { fill: var(--muted); }
+.attach { fill: none; stroke: var(--green); stroke-width: 3; opacity: 0; transition: opacity .4s; }
+.attach.on { opacity: 1; }
+.anchor-tag { fill: var(--blue); font-size: 10px; font-weight: 700; }
+.chip rect { stroke-width: 1.2; transition: fill .35s, stroke .35s; }
+.chip text { font-size: 10.5px; font-weight: 650; }
+.chip.ok rect { fill: var(--green-bg); stroke: var(--green); } .chip.ok text { fill: var(--green); }
+.chip.none rect, .chip.wd rect { fill: var(--grey-bg); stroke: var(--grey); } .chip.none text, .chip.wd text { fill: var(--grey); }
+.chip.rib rect { fill: var(--red-bg); stroke: var(--red); } .chip.rib text { fill: var(--red); }
+.bgp { fill: none; stroke-width: 2.2; stroke-dasharray: 7 6; transition: stroke .3s, opacity .3s; }
+.bgp.up { stroke: var(--green); animation: flow 1.2s linear infinite; }
+.bgp.down { stroke: var(--red); opacity: .55; stroke-dasharray: 2 7; }
+@keyframes flow { to { stroke-dashoffset: -26; } }
+.bgp-label { font-size: 11px; font-weight: 600; }
+.bgp-label.up { fill: var(--green); } .bgp-label.down { fill: var(--red); }
+.pk circle { stroke: var(--surface); stroke-width: 1.5; }
+.pk.rt5 circle { fill: var(--blue); } .pk.ad circle { fill: var(--green); } .pk.wd circle { fill: var(--red); }
+.pk.data circle { fill: var(--violet); }
+.pk-label { font-size: 9.5px; font-weight: 700; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; }
+.pk.rt5 .pk-label { fill: var(--blue); } .pk.ad .pk-label { fill: var(--green); } .pk.wd .pk-label { fill: var(--red); }
+.burst { fill: none; stroke: var(--red); stroke-width: 2.5; }
+.xmark { fill: var(--red); font-size: 16px; font-weight: 800; }
+.legend text { fill: var(--muted); font-size: 11px; }
+.counter text { font-size: 11.5px; font-weight: 600; }
+
+/* timeline */
+#s-timeline, #s-summary, #s-compare { flex-direction: column; gap: 14px; }
+#cmp svg { width: 100%; height: auto; display: block; }
+.cmp-title { font-size: 14px; font-weight: 700; }
+.cmp-title.ves { fill: var(--violet); } .cmp-title.gw { fill: var(--blue); }
+.cmp-sub { fill: var(--muted); font-size: 11px; }
+table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.cmp th, table.cmp td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+table.cmp th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+table.cmp th.ves { color: var(--violet); } table.cmp th.gw { color: var(--blue); }
+table.cmp td:first-child { font-weight: 600; width: 22%; }
+.good { color: var(--green); font-weight: 650; } .bad { color: var(--red); font-weight: 650; }
+.tbl-wrap { overflow-x: auto; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+.panel h2 { margin: 0 0 4px; font-size: 22px; }
+.panel p.sub { margin: 0; color: var(--muted); }
+#timeline svg { width: 100%; height: auto; display: block; }
+.tl-axis { stroke: var(--line); } .tl-tick { fill: var(--muted); font-size: 11px; }
+.tl-row { fill: var(--text); font-size: 12px; font-weight: 600; }
+.tl-ok { fill: var(--green); opacity: .85; } .tl-bad { fill: var(--red); opacity: .9; }
+.tl-mark { stroke: var(--muted); stroke-dasharray: 3 3; } .tl-note { fill: var(--muted); font-size: 11px; }
+.tl-head { stroke: var(--blue); stroke-width: 2; }
+.tl-never { fill: var(--red); font-size: 11.5px; font-weight: 700; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+.card h3 { margin: 0 0 6px; font-size: 15px; }
+.card p, .card ul { margin: 0; } .card ul { padding-left: 18px; } .card li { margin: 3px 0; }
+.card.bad { border-left: 4px solid var(--red); } .card.ok { border-left: 4px solid var(--green); } .card.info { border-left: 4px solid var(--blue); }
+@media (prefers-reduced-motion: reduce) { .bgp.up { animation: none; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">vES IP aliasing · BGP reset blackhole</span>
+  <button id="prev" aria-label="Previous slide">◀ Prev</button>
+  <button id="next" class="primary" aria-label="Next slide">Next ▶</button>
+  <button id="auto" aria-pressed="false">Autoplay</button>
+  <button id="theme" aria-label="Toggle theme">◐</button>
+  <span class="count" id="count"></span>
+</header>
+
+<main>
+  <!-- Title -->
+  <section class="slide" id="s-title">
+    <div class="kicker">SR Linux EVPN-VXLAN · 3-stage NVD lab</div>
+    <h1>Resetting the VM's BGP session blackholes its routes on leafs the VM isn't behind</h1>
+    <p class="lead">An IP-aliasing virtual Ethernet Segment is configured on every leaf so a BGP-speaking VM can move anywhere. After the VM's PE-CE BGP session resets, leafs that carry the vES but are neither attached nor BGP peers never reinstall the VM's routes.</p>
+    <div class="facts">
+      <div class="fact"><b>Trigger</b>RT5s carrying the vES ESI withdrawn and re-advertised (VM BGP reset, or a deploy)</div>
+      <div class="fact"><b>Impact</b>Traffic entering leaf3/leaf4 to 6.6.6.1 and 2001:db8::6:1 is dropped, with no recovery</div>
+      <div class="fact"><b>Releases</b>Reproduced on 25.10.4, 25.10.5 and 26.7.2. Not in the 25.10.6, 26.7.1 or 26.7.3 release notes</div>
+      <div class="fact"><b>Workaround</b>Admin-disable and re-enable the vES on the affected leafs</div>
+    </div>
+    <div><button class="primary" onclick="go(1)">Start the walkthrough ▶</button></div>
+  </section>
+
+  <!-- Animated stage -->
+  <section class="slide" id="s-stage">
+    <div class="stage-wrap"><svg id="stage" viewBox="0 0 1000 660" role="img" aria-labelledby="cap-title"></svg></div>
+    <div class="caption">
+      <div class="step" id="cap-step"></div>
+      <h2 id="cap-title"></h2>
+      <div id="cap-body"></div>
+      <pre class="term" id="cap-term" hidden></pre>
+      <div class="cap-actions"><button id="replay">↻ Replay this step</button></div>
+    </div>
+  </section>
+
+  <!-- Timeline -->
+  <section class="slide" id="s-timeline">
+    <div class="panel">
+      <h2>Measured impact of one BGP reset (25.10.5, after the IPv6 update-source fix)</h2>
+      <p class="sub">Each leaf pings 6.6.6.1 and 2001:db8::6:1 from its own ipvrf-1 at 10 packets/s, sourced from its unique irb0.104 address. t = 0 is <code>clear bgp *</code> on vm1. Before the fix, IPv6 took 29.9 s on the healthy leafs.</p>
+    </div>
+    <div class="panel" id="timeline"><svg id="tl" viewBox="0 0 1000 470" role="img" aria-label="Per-leaf reachability timeline after a BGP reset"></svg></div>
+    <div class="cap-actions"><button id="tl-replay">↻ Replay timeline</button></div>
+  </section>
+
+  <!-- vES vs GW-IP -->
+  <section class="slide" id="s-compare">
+    <div class="panel">
+      <h2>vES vs RT5 GW-IP: same VM, same moves, same resets</h2>
+      <p class="sub">vm1 carries both tenants on two VLANs and moves as one. Tenant 1 (VLAN 104, ipvrf-1, 6.6.6.1) uses an IP-aliasing virtual ES on every leaf. Tenant 2 (VLAN 204, ipvrf-2, 6.6.6.2) has no vES: the anchors export the RT5 with <b>GW-IP 10.2.4.16</b>, and every leaf resolves that GW-IP itself. 25.10.5, IPv6 update-source fix applied to both.</p>
+    </div>
+    <div class="panel" id="cmp"><svg id="cmpsvg" viewBox="0 0 1000 300" role="img" aria-label="Per-leaf recovery after a VM BGP reset: vES versus GW-IP"></svg></div>
+    <div class="panel tbl-wrap">
+      <table class="cmp">
+        <thead><tr><th></th><th class="ves">Tenant 1 · virtual ES (ESI)</th><th class="gw">Tenant 2 · RT5 GW-IP</th></tr></thead>
+        <tbody>
+          <tr><td>BGP reset on the VM</td>
+              <td><span class="bad">leaf3/leaf4 never recover</span> (vES configured, not attached, no PE-CE BGP). Anchors and attached leafs back in 2.9–3.3 s.</td>
+              <td><span class="good">All six leafs back in 3.3 s</span>, IPv4 and IPv6. No toggle needed.</td></tr>
+          <tr><td>VM moves host3 ↔ host6 (BGP kept up)</td>
+              <td><span class="good">30 moves, 0.8–1.0 s</span> on every leaf. One move had a single transient ICMPv6 "No route" inside that window.</td>
+              <td><span class="good">20 moves, 0.8–1.0 s</span> on every leaf, no ICMP errors.</td></tr>
+          <tr><td>PE-CE sessions to leaf1/leaf2</td>
+              <td>Never flapped during moves</td><td>Never flapped during moves (up 21 min across all 20)</td></tr>
+          <tr><td>How a non-BGP leaf resolves 6.6.6.x</td>
+              <td>RT5 with the vES ESI → AD per-EVI routes of the <i>attached</i> leafs (IP aliasing)</td>
+              <td>RT5 with GW-IP 10.2.4.16 → the leaf's own route to 10.2.4.16: an RT2 IFL host route, or the local subnet when the VM is behind it</td></tr>
+          <tr><td>What every leaf needs</td>
+              <td>The vES (next-hop + ESI) on every leaf that may host the VM, plus the VM's MAC-VRF/IRB to decide attachment</td>
+              <td>The VM's MAC-VRF + anycast IRB, and <code>ip-prefix evpn-interface-less-gateway-ip advertise / resolve</code> in the ip-vrf</td></tr>
+          <tr><td>Follows the VM through</td>
+              <td>Re-attachment: which leafs have a non-EVPN route to the next-hop</td>
+              <td>EVPN MAC/IP mobility of the GW-IP (RT2 sequence numbers)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cap-actions"><button id="cmp-replay">↻ Replay comparison</button></div>
+  </section>
+
+  <!-- Summary -->
+  <section class="slide" id="s-summary">
+    <div class="panel"><h2>Summary</h2><p class="sub">What breaks, what doesn't, and how to reproduce it.</p></div>
+    <div class="grid">
+      <div class="card bad"><h3>What breaks</h3>
+        <p>A leaf with the vES configured that is <b>not attached</b> (the VM isn't behind it) and has <b>no PE-CE BGP</b> to the VM drops the VM's RT5s after they are withdrawn and re-advertised. The RT5 is Best/Valid in the BGP RIB and the AD per-EVI routes (P=1) are present, but the route never enters ipvrf-1.</p></div>
+      <div class="card ok"><h3>What keeps working</h3>
+        <ul><li>Anchor leafs leaf1/leaf2 (they learn the routes over PE-CE BGP)</li>
+        <li>Attached leafs leaf5/leaf6 (the VM is behind them)</li>
+        <li>VM moves with BGP kept up: 30 moves host3 ↔ host6, 0.8–1.0 s gap on every leaf, IPv4 and IPv6, sessions never flapped</li></ul></div>
+      <div class="card info"><h3>Releases</h3>
+        <ul><li>Reproduced: 25.10.4, 25.10.5, 26.7.2</li>
+        <li>Not listed as a known or resolved issue in the 25.10.6, 26.7.1 or 26.7.3 release notes</li>
+        <li>25.10.6 and 26.7.3 images aren't on ghcr yet, so they're untested</li></ul></div>
+      <div class="card info"><h3>Workaround</h3>
+<pre class="term"><span class="p">leaf3#</span> enter candidate
+set / system network-instance protocols evpn ethernet-segments bgp-instance 1 ethernet-segment vES-host6-tenant1 admin-state disable
+commit now
+<span class="p">leaf3#</span> enter candidate
+set / system network-instance protocols evpn ethernet-segments bgp-instance 1 ethernet-segment vES-host6-tenant1 admin-state enable
+commit now</pre>
+        <p class="muted" style="margin-top:6px">Same for vES-host6-tenant1-v6, on every affected leaf. It has to be repeated after every reset.</p></div>
+      <div class="card"><h3>Reproduce</h3>
+<pre class="term"><span class="p">$</span> docker exec clab-3-stage-evpn-vxlan-nvd-25-vm1 vtysh -c "clear bgp *"
+<span class="p">$</span> vm-mobility/check.sh
+<span class="dim">  leaf3 6.6.6.1=0 2001:db8::6:1=0</span>
+<span class="dim">  leaf4 6.6.6.1=0 2001:db8::6:1=0</span></pre></div>
+      <div class="card ok"><h3>Alternative that works: RT5 GW-IP</h3>
+        <p>Tenant 2 on the same VM, with GW-IP instead of a vES and the VM subnet on every leaf, recovered on all six leafs in 3.3 s after every BGP reset. 20 moves were clean (0.8–1.0 s). See the comparison slide.</p></div>
+      <div class="card"><h3>Also observed</h3>
+        <ul><li>IPv6 PE-CE sessions used to come back ~28 s after IPv4. vm1's SLAAC address was used as the source, so the leafs rejected vm1's connects until they connected themselves. Fixed with <code>neighbor leafs-v6 update-source 3fff:10:1:4::16</code>: IPv6 now recovers in 3.3 s like IPv4</li>
+        <li>Don't use <code>host-route populate evpn</code> as a workaround: it exports the VM /32 as an RT5 and pulls the VM's own IP to the wrong leaf</li></ul></div>
+    </div>
+  </section>
+</main>
+<footer id="dots"></footer>
+
+<script>
+(() => {
+const NS = 'http://www.w3.org/2000/svg';
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const el = (tag, attrs = {}, parent) => {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+};
+
+/* ---------- topology ---------- */
+const N = {
+  S1: { x: 260, y: 70, w: 92, h: 34, label: 'spine1' },
+  S2: { x: 420, y: 70, w: 92, h: 34, label: 'spine2' },
+  S3: { x: 580, y: 70, w: 92, h: 34, label: 'spine3' },
+  S4: { x: 740, y: 70, w: 92, h: 34, label: 'spine4' },
+  L1: { x: 110, y: 240, w: 112, h: 40, label: 'leaf1' },
+  L2: { x: 266, y: 240, w: 112, h: 40, label: 'leaf2' },
+  L3: { x: 422, y: 240, w: 112, h: 40, label: 'leaf3' },
+  L4: { x: 578, y: 240, w: 112, h: 40, label: 'leaf4' },
+  L5: { x: 734, y: 240, w: 112, h: 40, label: 'leaf5' },
+  L6: { x: 890, y: 240, w: 112, h: 40, label: 'leaf6' },
+  host2: { x: 188, y: 400, w: 124, h: 42, label: 'host2', sub: 'client · leaf1/2' },
+  host3: { x: 500, y: 400, w: 124, h: 42, label: 'host3', sub: 'client · leaf3/4' },
+  host6: { x: 812, y: 400, w: 124, h: 42, label: 'host6', sub: 'hypervisor · leaf5/6' },
+  vm1:   { x: 812, y: 506, w: 156, h: 48, label: 'vm1 (FRR)', sub: '6.6.6.1 · 10.1.4.16' },
+};
+const LEAFS = ['L1', 'L2', 'L3', 'L4', 'L5', 'L6'];
+const top = n => [N[n].x, N[n].y - N[n].h / 2];
+const bot = n => [N[n].x, N[n].y + N[n].h / 2];
+
+const svg = document.getElementById('stage');
+const gFab = el('g', {}, svg), gBgp = el('g', {}, svg), gNodes = el('g', {}, svg), gPk = el('g', {}, svg), gFx = el('g', {}, svg);
+
+for (const l of LEAFS) for (const s of ['S1', 'S2', 'S3', 'S4'])
+  el('line', { class: 'fabric', x1: top(l)[0], y1: top(l)[1], x2: bot(s)[0], y2: bot(s)[1] }, gFab);
+for (const [h, l] of [['host2', 'L1'], ['host2', 'L2'], ['host3', 'L3'], ['host3', 'L4'], ['host6', 'L5'], ['host6', 'L6'], ['vm1', 'host6']])
+  el('line', { class: 'access', x1: top(h)[0], y1: top(h)[1], x2: bot(l)[0], y2: bot(l)[1] }, gFab);
+// the virtual ES: configured on every leaf, tied to the VM's IP, not to a port
+const vesBand = el('rect', { class: 'ves-band', x: 44, y: 212, width: 912, height: 86, rx: 14 }, gFab);
+el('path', { class: 'ves-link', d: 'M956,288 C992,380 984,506 890,506' }, gFab);
+
+// PE-CE eBGP sessions, drawn as conceptual paths (they run over the stretched VLAN 104)
+const bgpPaths = [
+  el('path', { class: 'bgp up', d: 'M734,526 Q640,604 520,604 L70,604 Q40,604 40,574 L40,252 Q40,240 54,240' }, gBgp),
+  el('path', { class: 'bgp up', d: 'M734,516 Q640,584 520,584 L346,584 Q318,584 318,556 L318,262' }, gBgp),
+];
+const bgpLabel = el('text', { x: 330, y: 624, class: 'bgp-label up' }, gBgp);
+
+const chips = {}, vesTags = {}, vesText = {}, rings = {}, nhs = {};
+for (const [id, n] of Object.entries(N)) {
+  const g = el('g', { class: 'node' + (id === 'vm1' ? ' vm' : '') }, gNodes);
+  if (LEAFS.includes(id)) rings[id] = el('rect', { class: 'attach', x: n.x - n.w / 2 - 5, y: n.y - n.h / 2 - 5, width: n.w + 10, height: n.h + 10, rx: 11 }, g);
+  el('rect', { class: 'box', x: n.x - n.w / 2, y: n.y - n.h / 2, width: n.w, height: n.h, rx: 8 }, g);
+  const t = el('text', { x: n.x, y: n.sub ? n.y - 3 : n.y + 4.5, 'text-anchor': 'middle' }, g); t.textContent = n.label;
+  if (n.sub) { const s = el('text', { class: 'sub', x: n.x, y: n.y + 13, 'text-anchor': 'middle' }, g); s.textContent = n.sub; }
+  if (LEAFS.includes(id)) {
+    const v = el('g', { class: 'ves' }, gNodes);
+    el('rect', { x: n.x + n.w / 2 - 36, y: n.y - n.h / 2 - 9, width: 40, height: 16, rx: 4 }, v);
+    const vt = el('text', { x: n.x + n.w / 2 - 16, y: n.y - n.h / 2 + 3, 'text-anchor': 'middle' }, v); vt.textContent = 'vES';
+    vesTags[id] = v; vesText[id] = vt;
+    // next-hop check bubble: how this leaf resolves 10.1.4.16
+    const b = el('g', { class: 'nh cfg' }, gNodes);
+    el('rect', { x: n.x - 62, y: 146, width: 124, height: 32, rx: 6 }, b);
+    const b1 = el('text', { x: n.x, y: 159, 'text-anchor': 'middle' }, b);
+    const b2 = el('text', { x: n.x, y: 172, 'text-anchor': 'middle' }, b);
+    nhs[id] = { g: b, t1: b1, t2: b2 };
+    const c = el('g', { class: 'chip ok' }, gNodes);
+    el('rect', { x: n.x - 60, y: n.y + n.h / 2 + 8, width: 120, height: 24, rx: 6 }, c);
+    const ct = el('text', { x: n.x, y: n.y + n.h / 2 + 24, 'text-anchor': 'middle' }, c);
+    chips[id] = { g: c, t: ct };
+  }
+}
+for (const l of ['L1', 'L2']) {
+  const t = el('text', { class: 'anchor-tag', x: N[l].x, y: N[l].y + N[l].h / 2 + 48, 'text-anchor': 'middle' }, gNodes);
+  t.textContent = 'anchor · PE-CE BGP';
+}
+const vesLabel = el('text', { class: 'ves-label', x: 54, y: 207 }, gNodes);
+vesLabel.textContent = 'virtual ES vES-host6-tenant1 · ESI 00:01:ff:ff:ff:ff:ff:ff:ff:06 · next-hop 10.1.4.16 · all-active · on every leaf';
+const vesNh = el('text', { class: 'ves-label', x: 812, y: 548, 'text-anchor': 'middle' }, gNodes);
+vesNh.textContent = 'vES next-hop 10.1.4.16 = vm1';
+[['attached to the vES', 396], ['(VM behind leaf5/6)', 409]].forEach(([txt, y]) => {
+  const a = el('text', { class: 'anchor-tag', x: 940, y, 'text-anchor': 'middle' }, gNodes);
+  a.style.fill = 'var(--green)'; a.textContent = txt;
+});
+
+// legend
+const lg = el('g', { class: 'legend' }, svg);
+[['var(--blue)', 'RT5 6.6.6.1 (vES ESI)'], ['var(--green)', 'AD per-EVI (P=1)'], ['var(--red)', 'withdraw / drop'], ['var(--violet)', 'data to 6.6.6.1']]
+  .forEach(([c, txt], i) => {
+    const x = 470 + i * 132;
+    el('circle', { cx: x, cy: 646, r: 5, style: `fill:${c}` }, lg);
+    const t = el('text', { x: x + 9, y: 650 }, lg); t.textContent = txt;
+  });
+// live drop/delivered counter
+const counter = el('g', { class: 'counter' }, svg);
+const cOk = el('text', { x: 20, y: 30, style: 'fill:var(--green)' }, counter);
+const cBad = el('text', { x: 20, y: 48, style: 'fill:var(--red)' }, counter);
+
+/* ---------- state ---------- */
+const CHIP_TEXT = { ok: '6.6.6.1 ✓ in FIB', none: '6.6.6.1 —', wd: 'withdrawn', rib: 'RIB ✓ · FIB ✗' };
+let state;
+function render() {
+  for (const l of LEAFS) {
+    const r = state.routes[l];
+    chips[l].g.setAttribute('class', 'chip ' + r);
+    chips[l].t.textContent = CHIP_TEXT[r];
+    rings[l].classList.toggle('on', !!state.attached[l]);
+    const v = state.ves[l];
+    vesTags[l].classList.remove('att', 'cfg', 'stale'); vesTags[l].classList.add(v);
+    vesText[l].textContent = v === 'att' ? 'vES ✓' : v === 'stale' ? 'vES !' : 'vES';
+    const nh = state.nh[l];
+    nhs[l].g.setAttribute('class', 'nh ' + (nh || 'cfg') + (nh ? ' show' : ''));
+    nhs[l].t1.textContent = nh === 'att' ? '10.1.4.16 via arp-nd' : '10.1.4.16 via EVPN';
+    nhs[l].t2.textContent = nh === 'att' ? '(local) → attached' : '(IFL host) → not attached';
+  }
+  for (const p of bgpPaths) p.setAttribute('class', 'bgp ' + state.bgp);
+  bgpLabel.setAttribute('class', 'bgp-label ' + state.bgp);
+  bgpLabel.textContent = state.bgp === 'up' ? 'eBGP vm1 ↔ leaf1/leaf2 established (IPv4 + IPv6)' : 'eBGP vm1 ↔ leaf1/leaf2 DOWN (clear bgp *)';
+  cOk.textContent = `delivered: ${state.delivered}`;
+  cBad.textContent = `dropped:   ${state.dropped}`;
+}
+
+/* ---------- animation helpers ---------- */
+let runId = 0, timers = [];
+const later = (ms, fn) => { const id = runId; timers.push(setTimeout(() => { if (id === runId) fn(); }, ms)); };
+function stopAll() { runId++; timers.forEach(clearTimeout); timers = []; gPk.textContent = ''; gFx.textContent = ''; }
+const ease = k => (k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
+
+function sendPacket(pts, o) {
+  const my = runId;
+  if (reduceMotion) { later(Math.min(o.dur, 250), () => o.onEnd && o.onEnd()); return; }
+  const path = el('path', { d: pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ',' + p[1]).join(' '), fill: 'none' }, gPk);
+  const len = path.getTotalLength();
+  const g = el('g', { class: 'pk ' + o.cls }, gPk);
+  el('circle', { r: o.r || 5 }, g);
+  if (o.label) { const t = el('text', { class: 'pk-label', y: -9, 'text-anchor': 'middle' }, g); t.textContent = o.label; }
+  const start = performance.now();
+  (function step(now) {
+    if (my !== runId) { path.remove(); g.remove(); return; }
+    const k = Math.min(1, (now - start) / o.dur);
+    const p = path.getPointAtLength(ease(k) * len);
+    g.setAttribute('transform', `translate(${p.x},${p.y})`);
+    if (k < 1) requestAnimationFrame(step); else { path.remove(); g.remove(); o.onEnd && o.onEnd(); }
+  })(start);
+}
+function burst(n) {
+  if (reduceMotion) return;
+  const [x, y] = [N[n].x, N[n].y + 4];
+  const c = el('circle', { class: 'burst', cx: x, cy: y, r: 6 }, gFx);
+  const t = el('text', { class: 'xmark', x: x - 46, y: y + 6, 'text-anchor': 'middle' }, gFx); t.textContent = '✗';
+  const start = performance.now(), my = runId;
+  (function step(now) {
+    if (my !== runId) return;
+    const k = Math.min(1, (now - start) / 650);
+    c.setAttribute('r', 6 + 26 * k); c.setAttribute('opacity', 1 - k); t.setAttribute('opacity', 1 - k * k);
+    if (k < 1) requestAnimationFrame(step); else { c.remove(); t.remove(); }
+  })(start);
+}
+// control-plane fan-out: from leaf via spine to every other leaf
+function fanout(from, spine, cls, label, onArrive) {
+  LEAFS.filter(t => t !== from).forEach((t, i) => later(i * 70, () =>
+    sendPacket([top(from), bot(spine), top(t)], { cls, label: i === 0 ? label : '', dur: 1100, r: 5.5, onEnd: () => onArrive && onArrive(t) })));
+}
+// data: client -> ingress leaf (lookup) -> spine -> egress leaf -> host6 -> vm1
+const FLOWS = [
+  { host: 'host3', in: 'L3', sp: 'S2', out: 'L5' },
+  { host: 'host2', in: 'L1', sp: 'S1', out: 'L6' },
+  { host: 'host3', in: 'L4', sp: 'S3', out: 'L6' },
+  { host: 'host2', in: 'L2', sp: 'S4', out: 'L5' },
+];
+function sendData(f) {
+  sendPacket([top(f.host), bot(f.in)], { cls: 'data', dur: 650, r: 4.5, onEnd: () => {
+    if (state.routes[f.in] === 'ok') {
+      sendPacket([top(f.in), bot(f.sp), top(f.out), bot(f.out), top('host6'), bot('host6'), top('vm1')],
+        { cls: 'data', dur: 1500, r: 4.5, onEnd: () => { state.delivered++; render(); } });
+    } else { state.dropped++; render(); burst(f.in); }
+  } });
+}
+function traffic() { let k = 0; const tick = () => { sendData(FLOWS[k++ % FLOWS.length]); later(420, tick); }; tick(); }
+const setRoutes = (v, which = LEAFS) => which.forEach(l => (state.routes[l] = v));
+
+/* ---------- scenes ---------- */
+const term = (lines) => lines.join('\n');
+const SCENES = [
+  {
+    title: 'The setup',
+    body: `<p>vm1 is an FRR "VM" on hypervisor <b>host6</b>, LACP-attached to leaf5/leaf6 on VLAN 104. It runs eBGP (IPv4 and IPv6) only to the <b>anchor leafs leaf1/leaf2</b> and advertises 6.6.6.1 and 2001:db8::6:1.</p>
+      <ul><li>Every leaf carries the IP-aliasing <b>virtual ES</b> (the dashed purple band, next-hop 10.1.4.16) so the VM can move to any hypervisor.</li>
+      <li>A leaf is <b>attached</b> when its own route to 10.1.4.16 is non-EVPN, which means the VM is behind it. Right now that's leaf5/leaf6 (green ring).</li>
+      <li>leaf3/leaf4 are neither attached nor BGP peers. Watch them.</li></ul>`,
+    setup() { setRoutes('ok'); },
+    run() {},
+  },
+  {
+    title: 'The virtual ES: which leafs are attached',
+    body: `<p>The vES isn't bound to a port. It's bound to the VM's IP: <b>next-hop 10.1.4.16</b>, ESI 00:01:ff:ff:ff:ff:ff:ff:ff:06, all-active, configured the same way on all six leafs (the dashed band).</p>
+      <ul><li>Each leaf looks up 10.1.4.16 in ipvrf-1. A <b>non-EVPN</b> route (a local ARP/ND entry, a local subnet or a static route) means the VM is behind it, so the leaf is <b style="color:var(--green)">attached</b>: it advertises AD per-ES/per-EVI routes and is a DF candidate.</li>
+      <li>An <b>EVPN</b> route (the IFL host route learnt from another leaf) means the vES is only <b>configured</b>: no AD routes, not a candidate.</li>
+      <li>Other leafs use the attached leafs' AD routes to resolve any RT5 that carries this ESI. That's <b>IP aliasing</b>.</li></ul>
+      <p class="muted">A second vES (ESI …:16, next-hop 3fff:10:1:4::16) does the same for IPv6.</p>`,
+    term: term([
+      '<span class="p">leaf3#</span> info flat system network-instance protocols evpn ethernet-segments',
+      '... ethernet-segment vES-host6-tenant1 type virtual',
+      '... ethernet-segment vES-host6-tenant1 esi 00:01:ff:ff:ff:ff:ff:ff:ff:06',
+      '... ethernet-segment vES-host6-tenant1 multi-homing-mode all-active',
+      '... ethernet-segment vES-host6-tenant1 next-hop 10.1.4.16 evi 1',
+      '<span class="p">leaf3#</span> show system network-instance ethernet-segments vES-host6-tenant1 detail',
+      '  Oper State : <span class="ok">up</span>',
+      '  Candidates : 192.0.2.15, 192.0.2.16 (DF)   <span class="dim">= leaf5, leaf6</span>']),
+    setup() { setRoutes('ok'); state.attached = {}; LEAFS.forEach(l => (state.ves[l] = 'cfg')); },
+    run() {
+      later(200, () => vesBand.classList.add('pulse'));
+      later(1300, () => vesBand.classList.remove('pulse'));
+      LEAFS.forEach((l, i) => later(1400 + i * 600, () => {
+        const att = l === 'L5' || l === 'L6';
+        state.nh[l] = att ? 'att' : 'cfg'; state.ves[l] = att ? 'att' : 'cfg';
+        if (att) state.attached[l] = true;
+        render();
+      }));
+    },
+  },
+  {
+    title: 'How every leaf learns 6.6.6.1',
+    body: `<ul><li><b>leaf5/leaf6</b> (attached) advertise <span style="color:var(--green)">AD per-EVI routes</span> for the vES ESI with P=1.</li>
+      <li><b>leaf1/leaf2</b> learn 6.6.6.1 over PE-CE BGP and export it as an <span style="color:var(--blue)">RT5 carrying the vES ESI</span>.</li>
+      <li><b>leaf3/leaf4</b> have no BGP session to the VM. They resolve the RT5 through the AD routes: IP aliasing to leaf5/leaf6.</li></ul>`,
+    setup() { setRoutes('none'); },
+    run() {
+      later(300, () => { fanout('L5', 'S4', 'ad', 'AD per-EVI'); fanout('L6', 'S3', 'ad', ''); });
+      later(1900, () => { setRoutes('ok', ['L1', 'L2']); render();
+        const arrive = t => { state.routes[t] = 'ok'; render(); };
+        fanout('L1', 'S1', 'rt5', 'RT5 6.6.6.1 · ESI', arrive); fanout('L2', 'S2', 'rt5', '', arrive); });
+    },
+  },
+  {
+    title: 'Steady state: traffic flows from every leaf',
+    body: `<p>Clients behind leaf1/leaf2 and leaf3/leaf4 all reach 6.6.6.1. The ingress leaf looks up 6.6.6.1 in ipvrf-1 and sends the packet over VXLAN to leaf5/leaf6, which bridge it to host6 and vm1.</p>
+      <p class="muted">Every purple packet does a route lookup on its ingress leaf: it's delivered only if that leaf has 6.6.6.1 in its FIB.</p>`,
+    setup() { setRoutes('ok'); },
+    run() { traffic(); },
+  },
+  {
+    title: 'Trigger: the VM resets its BGP sessions',
+    body: `<p>The sessions to leaf1/leaf2 drop. The anchors <span style="color:var(--red)">withdraw the RT5</span> and every leaf removes 6.6.6.1, so traffic is dropped everywhere for a moment. So far this is expected.</p>`,
+    term: term(['<span class="p">vm1#</span> clear bgp *', '<span class="dim">% sessions to 10.1.4.201/.202, 3fff:10:1:4::201/::202 reset</span>']),
+    setup() { setRoutes('ok'); },
+    run() {
+      traffic();
+      later(1400, () => { state.bgp = 'down'; setRoutes('wd', ['L1', 'L2']); render();
+        const arrive = t => { state.routes[t] = 'wd'; render(); };
+        fanout('L1', 'S1', 'wd', 'withdraw RT5', arrive); fanout('L2', 'S2', 'wd', '', arrive); });
+    },
+  },
+  {
+    title: 'Sessions come back, RT5 re-advertised',
+    body: `<p>The sessions re-establish after about 3 s (IPv4 and IPv6) and the anchors re-advertise the RT5.</p>
+      <ul><li><b>leaf1/leaf2</b> install it (they have the PE-CE route).</li>
+      <li><b>leaf5/leaf6</b> install it (they're attached).</li>
+      <li><b style="color:var(--red)">leaf3/leaf4</b> have the vES configured but aren't attached (red "vES !" tag). The RT5 is Best/Valid in the BGP RIB and the AD routes from leaf5/leaf6 are present, but the route <b>never enters ipvrf-1</b>.</li></ul>`,
+    setup() { state.bgp = 'down'; setRoutes('wd'); },
+    run() {
+      traffic();
+      later(1100, () => { state.bgp = 'up'; setRoutes('ok', ['L1', 'L2']); render();
+        const arrive = t => { const stuck = t === 'L3' || t === 'L4'; state.routes[t] = stuck ? 'rib' : 'ok'; if (stuck) state.ves[t] = 'stale'; render(); };
+        fanout('L1', 'S1', 'rt5', 'RT5 6.6.6.1 · ESI', arrive); fanout('L2', 'S2', 'rt5', '', arrive); });
+    },
+  },
+  {
+    title: 'Result: leaf3/leaf4 blackhole the VM',
+    body: `<p>Traffic from host3 that hashes to leaf3/leaf4 is dropped, and it stays dropped: no recovery after 60 s, or after 100 s in an earlier run. host2 behind the anchors is fine.</p>
+      <p>The pattern: <b>vES configured + not attached + no PE-CE BGP</b>. leaf1/leaf2 have the BGP session, leaf5/leaf6 are attached, and leaf3/leaf4 have neither.</p>
+      <p class="muted">The same happens for 2001:db8::6:1 through the IPv6 vES.</p>`,
+    term: term([
+      '<span class="p">leaf3#</span> show network-instance default protocols bgp routes evpn route-type 5 prefix 6.6.6.1/32 detail',
+      '  Path 1: <span class="ok">&lt;Best,Valid&gt;</span>   ESI 00:01:ff:ff:ff:ff:ff:ff:ff:06   Invalid Reason: None',
+      '<span class="p">leaf3#</span> info from state /network-instance ipvrf-1 route-table ipv4-unicast route 6.6.6.1/32',
+      '<span class="bad">  (no entry)</span>']),
+    setup() { setRoutes('ok', ['L1', 'L2', 'L5', 'L6']); setRoutes('rib', ['L3', 'L4']); state.ves.L3 = state.ves.L4 = 'stale'; },
+    run() { traffic(); },
+  },
+  {
+    title: 'Workaround: toggle the vES on the affected leafs',
+    body: `<p>An admin-state disable/enable of the vES on leaf3/leaf4 makes them re-resolve the RT5, and traffic is restored right away.</p>
+      <p class="muted">It's not a fix: the next BGP reset on the VM repeats the problem. It reproduces on 25.10.4, 25.10.5 and 26.7.2, and isn't in any release notes up to 25.10.6 and 26.7.3.</p>`,
+    term: term([
+      '<span class="p">leaf3#</span> set / system network-instance protocols evpn ethernet-segments bgp-instance 1',
+      '        ethernet-segment vES-host6-tenant1 admin-state disable   <span class="dim">(commit)</span>',
+      '<span class="p">leaf3#</span> ... admin-state enable   <span class="dim">(commit)</span>',
+      '<span class="ok">  6.6.6.1/32 bgp-evpn active true</span>']),
+    setup() { setRoutes('ok', ['L1', 'L2', 'L5', 'L6']); setRoutes('rib', ['L3', 'L4']); state.ves.L3 = state.ves.L4 = 'stale'; },
+    run() {
+      traffic();
+      later(2200, () => ['L3', 'L4'].forEach(l => vesTags[l].classList.add('flash')));
+      later(3000, () => { ['L3', 'L4'].forEach(l => { vesTags[l].classList.remove('flash'); state.ves[l] = 'cfg'; }); setRoutes('ok', ['L3', 'L4']); render(); });
+    },
+  },
+];
+
+function playScene(i) {
+  stopAll();
+  Object.values(vesTags).forEach(v => v.classList.remove('flash'));
+  vesBand.classList.remove('pulse');
+  state = { routes: {}, attached: { L5: true, L6: true }, bgp: 'up', delivered: 0, dropped: 0,
+            ves: { L1: 'cfg', L2: 'cfg', L3: 'cfg', L4: 'cfg', L5: 'att', L6: 'att' }, nh: {} };
+  const s = SCENES[i];
+  s.setup(); render();
+  document.getElementById('cap-step').textContent = `Step ${i + 1} of ${SCENES.length}`;
+  document.getElementById('cap-title').textContent = s.title;
+  document.getElementById('cap-body').innerHTML = s.body;
+  const tm = document.getElementById('cap-term');
+  tm.hidden = !s.term; tm.innerHTML = s.term || '';
+  s.run();
+}
+
+/* ---------- timeline ---------- */
+const tl = document.getElementById('tl');
+const T0 = -3, T1 = 62, X0 = 150, X1 = 960;
+const tx = t => X0 + (t - T0) / (T1 - T0) * (X1 - X0);
+const ROWS = [
+  ['leaf1', 'IPv4', 3.3], ['leaf1', 'IPv6', 3.3], ['leaf2', 'IPv4', 2.9], ['leaf2', 'IPv6', 3.3],
+  ['leaf3', 'IPv4', null], ['leaf3', 'IPv6', null], ['leaf4', 'IPv4', null], ['leaf4', 'IPv6', null],
+  ['leaf5', 'IPv4', 3.3], ['leaf5', 'IPv6', 3.3], ['leaf6', 'IPv4', 3.3], ['leaf6', 'IPv6', 3.3],
+];
+let tlRun = 0;
+function buildTimeline() {
+  tl.textContent = '';
+  const my = ++tlRun;
+  const rowY = i => 40 + i * 30 + Math.floor(i / 2) * 6;
+  for (let t = 0; t <= 60; t += 10) {
+    el('line', { class: 'tl-axis', x1: tx(t), x2: tx(t), y1: 30, y2: 440 }, tl);
+    const lab = el('text', { class: 'tl-tick', x: tx(t), y: 458, 'text-anchor': 'middle' }, tl); lab.textContent = t + ' s';
+  }
+  const clip = el('clipPath', { id: 'tlclip' }, el('defs', {}, tl));
+  const clipRect = el('rect', { x: X0, y: 0, width: 0, height: 470 }, clip);
+  const bars = el('g', { 'clip-path': 'url(#tlclip)' }, tl);
+  ROWS.forEach(([leaf, af, rec], i) => {
+    const y = rowY(i);
+    const lab = el('text', { class: 'tl-row', x: 20, y: y + 14 }, tl); lab.textContent = `${leaf} ${af}`;
+    el('rect', { class: 'tl-ok', x: tx(T0), y, width: tx(0) - tx(T0), height: 18, rx: 3 }, bars);
+    const end = rec == null ? T1 : rec;
+    el('rect', { class: 'tl-bad', x: tx(0), y, width: tx(end) - tx(0), height: 18, rx: 3 }, bars);
+    if (rec != null) el('rect', { class: 'tl-ok', x: tx(rec), y, width: tx(T1) - tx(rec), height: 18, rx: 3 }, bars);
+    else { const n = el('text', { class: 'tl-never', x: tx(36), y: y + 13.5, 'text-anchor': 'middle', fill: '#fff' }, bars); n.style.fill = '#fff'; n.textContent = 'no recovery: vES toggle needed'; }
+  });
+  [[0, 'clear bgp *'], [3.3, 'PE-CE sessions up, IPv4 and IPv6 (3.3 s)']].forEach(([t, txt], i) => {
+    el('line', { class: 'tl-mark', x1: tx(t), x2: tx(t), y1: 22, y2: 440 }, tl);
+    const n = el('text', { class: 'tl-note', x: tx(t) + 4, y: 18 - (i === 1 ? 0 : 0), 'text-anchor': i === 0 ? 'end' : 'start' }, tl);
+    if (i === 0) n.setAttribute('x', tx(t) - 4);
+    n.textContent = txt;
+  });
+  const head = el('line', { class: 'tl-head', x1: X0, x2: X0, y1: 26, y2: 444 }, tl);
+  const dur = reduceMotion ? 1 : 6500, start = performance.now();
+  (function step(now) {
+    if (my !== tlRun) return;
+    const k = Math.min(1, (now - start) / dur);
+    const x = X0 + k * (X1 - X0);
+    clipRect.setAttribute('width', x - X0);
+    head.setAttribute('x1', x); head.setAttribute('x2', x);
+    if (k < 1) requestAnimationFrame(step); else head.remove();
+  })(start);
+}
+
+/* ---------- vES vs GW-IP comparison ---------- */
+const cmp = document.getElementById('cmpsvg');
+const C_T0 = -2, C_T1 = 30;
+const CMP = [
+  { cls: 'ves', title: 'Tenant 1 · vES: BGP reset', x0: 90, x1: 470,
+    rows: [['leaf1', 3.3], ['leaf2', 3.3], ['leaf3', null], ['leaf4', null], ['leaf5', 3.3], ['leaf6', 3.3]] },
+  { cls: 'gw', title: 'Tenant 2 · GW-IP: BGP reset', x0: 590, x1: 970,
+    rows: [['leaf1', 3.3], ['leaf2', 3.3], ['leaf3', 3.3], ['leaf4', 3.3], ['leaf5', 3.3], ['leaf6', 3.3]] },
+];
+let cmpRun = 0;
+function buildCompare() {
+  cmp.textContent = '';
+  const my = ++cmpRun;
+  const defs = el('defs', {}, cmp);
+  const clips = [];
+  CMP.forEach((pnl, k) => {
+    const cx = t => pnl.x0 + (t - C_T0) / (C_T1 - C_T0) * (pnl.x1 - pnl.x0);
+    const ttl = el('text', { class: 'cmp-title ' + pnl.cls, x: pnl.x0 - 70, y: 22 }, cmp); ttl.textContent = pnl.title;
+    const sub = el('text', { class: 'cmp-sub', x: pnl.x0 - 70, y: 38 }, cmp); sub.textContent = 'IPv4 and IPv6 behave the same · t = 0 is clear bgp on vm1';
+    for (let t = 0; t <= 30; t += 10) {
+      el('line', { class: 'tl-axis', x1: cx(t), x2: cx(t), y1: 50, y2: 262 }, cmp);
+      const lab = el('text', { class: 'tl-tick', x: cx(t), y: 280, 'text-anchor': 'middle' }, cmp); lab.textContent = t + ' s';
+    }
+    const clip = el('clipPath', { id: 'cmpclip' + k }, defs);
+    clips.push(el('rect', { x: pnl.x0, y: 0, width: 0, height: 300 }, clip));
+    const bars = el('g', { 'clip-path': `url(#cmpclip${k})` }, cmp);
+    pnl.rows.forEach(([leaf, rec], i) => {
+      const y = 58 + i * 34;
+      const lab = el('text', { class: 'tl-row', x: pnl.x0 - 70, y: y + 15 }, cmp); lab.textContent = leaf;
+      el('rect', { class: 'tl-ok', x: cx(C_T0), y, width: cx(0) - cx(C_T0), height: 20, rx: 3 }, bars);
+      const end = rec == null ? C_T1 : rec;
+      el('rect', { class: 'tl-bad', x: cx(0), y, width: cx(end) - cx(0), height: 20, rx: 3 }, bars);
+      if (rec != null) el('rect', { class: 'tl-ok', x: cx(rec), y, width: cx(C_T1) - cx(rec), height: 20, rx: 3 }, bars);
+      else { const n = el('text', { class: 'tl-never', x: cx(16), y: y + 14.5, 'text-anchor': 'middle' }, bars); n.style.fill = '#fff'; n.textContent = 'no recovery'; }
+    });
+  });
+  const dur = reduceMotion ? 1 : 4000, start = performance.now();
+  (function step(now) {
+    if (my !== cmpRun) return;
+    const k = Math.min(1, (now - start) / dur);
+    CMP.forEach((pnl, i) => clips[i].setAttribute('width', k * (pnl.x1 - pnl.x0)));
+    if (k < 1) requestAnimationFrame(step);
+  })(start);
+}
+
+/* ---------- slides ---------- */
+const SLIDES = [{ id: 's-title' }, ...SCENES.map((_, i) => ({ id: 's-stage', scene: i })), { id: 's-timeline' }, { id: 's-compare' }, { id: 's-summary' }];
+let cur = 0, autoTimer = null;
+const dots = document.getElementById('dots');
+SLIDES.forEach((_, i) => { const b = document.createElement('button'); b.className = 'dot'; b.setAttribute('aria-label', `Slide ${i + 1}`); b.onclick = () => go(i); dots.appendChild(b); });
+function go(i) {
+  cur = Math.max(0, Math.min(SLIDES.length - 1, i));
+  const s = SLIDES[cur];
+  document.querySelectorAll('section.slide').forEach(x => x.classList.toggle('active', x.id === s.id));
+  if (s.id === 's-stage') playScene(s.scene); else stopAll();
+  if (s.id === 's-timeline') buildTimeline(); else tlRun++;
+  if (s.id === 's-compare') buildCompare(); else cmpRun++;
+  document.getElementById('count').textContent = `${cur + 1} / ${SLIDES.length}`;
+  document.getElementById('prev').disabled = cur === 0;
+  document.getElementById('next').disabled = cur === SLIDES.length - 1;
+  [...dots.children].forEach((d, j) => d.classList.toggle('on', j === cur));
+}
+window.go = go;
+document.getElementById('prev').onclick = () => go(cur - 1);
+document.getElementById('next').onclick = () => go(cur + 1);
+document.getElementById('replay').onclick = () => playScene(SLIDES[cur].scene);
+document.getElementById('tl-replay').onclick = buildTimeline;
+document.getElementById('cmp-replay').onclick = buildCompare;
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(cur + 1); }
+  if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(cur - 1); }
+});
+const autoBtn = document.getElementById('auto');
+autoBtn.onclick = () => {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; autoBtn.setAttribute('aria-pressed', 'false'); autoBtn.textContent = 'Autoplay'; return; }
+  autoBtn.setAttribute('aria-pressed', 'true'); autoBtn.textContent = 'Stop autoplay';
+  autoTimer = setInterval(() => { if (cur >= SLIDES.length - 1) autoBtn.click(); else go(cur + 1); }, 9000);
+};
+document.getElementById('theme').onclick = () => {
+  const r = document.documentElement;
+  const dark = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme = dark ? 'light' : 'dark';
+};
+go(0);
+})();
+</script>
+</body>
+</html>
