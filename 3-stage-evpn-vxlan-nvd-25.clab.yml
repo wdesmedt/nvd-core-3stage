@@ -230,6 +230,16 @@ topology:
         - ip link set br204 mtu 9000
         - ip link set bond0.204 master br204
         - ip link set br204 up
+        - ip link set eth3 mtu 9000
+        - ip link set eth3 up
+        - ip link add link eth3 name eth3.104 type vlan id 104
+        - ip link add link eth3 name eth3.204 type vlan id 204
+        - ip link set eth3.104 mtu 9000
+        - ip link set eth3.204 mtu 9000
+        - ip link set eth3.104 master br104
+        - ip link set eth3.204 master br204
+        - ip link set eth3.104 up
+        - ip link set eth3.204 up
         - apk add --no-cache lldpd
         - "lldpd -I '*,!eth0'"
     vm1:
