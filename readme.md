@@ -88,7 +88,7 @@ The PE-CE BGP workloads that used to live in vrf1 and vrf2 on host6 are modelled
   * VLANs 104 and 204 on the host1 LAG (leaf1-4) and host3 LAG (leaf3/4)
   * Tenant 1: IP-aliasing virtual ESs on all leafs: `vES-host6-tenant1` (next-hop 10.1.4.16) and `vES-host6-tenant1-v6` (next-hop 3fff:10:1:4::16), all-active, evi 1
   * Tenant 2: `ip-prefix evpn-interface-less-gateway-ip advertise` and `resolve` in ipvrf-2 on all leafs, no vES
-  * Leaf additions are in `vm-mobility/leaf/<leaf>.cfg` (tenant 1) and `vm-mobility/leaf/<leaf>.tenant2.cfg` (tenant 2), flat set commands, not yet merged into `srl-configs/`
+  * The startup configs in `srl-configs/` hold all of this (regenerated from the running leafs); the additions are also kept separately in `vm-mobility/leaf/<leaf>.cfg` (tenant 1) and `vm-mobility/leaf/<leaf>.tenant2.cfg` (tenant 2)
   * leaf6 has `host-route populate evpn` on irb0.104 and irb0.204 in its running config (the other leafs don't)
 
 ### Moving the VM

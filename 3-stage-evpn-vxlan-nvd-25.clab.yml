@@ -100,6 +100,7 @@ topology:
         - ip link set br204 mtu 9000
         - ip link set bond0.204 master br204
         - ip link set br204 up
+        - "lldpd -I '*,!eth0'"
     host2:
       group: host
       exec:
@@ -115,6 +116,7 @@ topology:
         - ip link set vrf1 up
         - ip addr add 10.1.2.12/24 dev bond0
         - ip route add 0.0.0.0/0 vrf vrf1 nexthop via 10.1.2.1 dev bond0
+        - "lldpd -I '*,!eth0'"
     host3:
       group: host
       exec:
@@ -165,6 +167,7 @@ topology:
         - ip link set br204 mtu 9000
         - ip link set bond0.204 master br204
         - ip link set br204 up
+        - "lldpd -I '*,!eth0'"
     host4:
       group: host
       exec:
@@ -180,6 +183,7 @@ topology:
         - ip link set vrf2 up
         - ip addr add 10.2.2.14/24 dev bond0
         - ip route add 0.0.0.0/0 vrf vrf2 nexthop via 10.2.2.1 dev bond0
+        - "lldpd -I '*,!eth0'"
     host5:
       group: frr
       exec:
@@ -200,6 +204,8 @@ topology:
         - ip addr add 5.5.5.5/32 dev dummy1
         - ip -6 addr add 2001:db8::5/128 dev dummy1
         - ip link set dummy1 mtu 9000
+        - apk add --no-cache lldpd
+        - "lldpd -I '*,!eth0'"
     host6:
       group: frr
       exec:
@@ -224,6 +230,8 @@ topology:
         - ip link set br204 mtu 9000
         - ip link set bond0.204 master br204
         - ip link set br204 up
+        - apk add --no-cache lldpd
+        - "lldpd -I '*,!eth0'"
     vm1:
       group: frr
       exec:
@@ -281,6 +289,7 @@ topology:
         - ip addr add 10.2.3.17/24 dev eth1.203
         - ip route add 0.0.0.0/0 vrf vrf1 nexthop via 10.1.3.1 dev eth1.103
         - ip route add 0.0.0.0/0 vrf vrf2 nexthop via 10.2.3.1 dev eth1.203
+        - "lldpd -I '*,!eth0'"
     host8:
       group: host
       exec:
@@ -292,6 +301,7 @@ topology:
         - ip addr add 10.99.0.18/24 dev eth1
         - ip -6 addr add 3fff:10:99::18/64 dev eth1
         - ip route add 0.0.0.0/0 vrf vrf-ss nexthop via 10.99.0.1 dev eth1
+        - "lldpd -I '*,!eth0'"
     
   links:
     - endpoints: [ "spine1:ethernet-1/1", "leaf1:ethernet-1/29" ]
