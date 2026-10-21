@@ -139,39 +139,49 @@ set / system network-instance protocols evpn ethernet-segments bgp-instance 1 et
 * Do not use `arp/nd host-route populate evpn` on irb0.104 as a workaround: the leaf then exports the VM /32 as an RT5 and attaches to the vES, which pulls the VM's own IP towards the wrong leaf
 
 ## Kubernetes worker nodes (k8s1-k8s6)
-Six FRR containers act as k8s worker nodes whose CNI (Calico, Cilium, MetalLB FRR mode) speaks BGP to the fabric. Each one advertises its pod CIDR and an anycast LoadBalancer VIP and only needs a default route back. The design keeps the fabric config independent of the number of nodes: adding a node needs no leaf change.
+Six FRR containers act as k8s worker nodes whose CNI speaks BGP to the fabric. Each one advertises its pod CIDR, its node IP and an anycast LoadBalancer VIP. Neither the fabric config nor the node BGP config depends on the node or on the leaf it is cabled to: no leaf address appears in a node config, and adding a node needs no leaf change. Two designs run side by side:
+
+| | Racks 1-2: BGP unnumbered | Rack 3: default-gateway auto-discovery |
+|---|---|---|
+| Nodes / leafs | k8s1-k8s4 on leaf1-leaf4 | k8s5, k8s6 on leaf5/leaf6 |
+| Mimics | FRR-K8s / MetalLB FRR mode (`interface` neighbor) | Cilium `autoDiscovery` mode `DefaultGateway` |
+| Node links | IPv6 link-local only | `10.30.<leaf>.1n/24`, `3fff:10:30:<leaf>::1n/64`, kernel default via eth1 (metric 100) and eth2 (metric 200) |
+| Node BGP | `neighbor eth1 interface` / `eth2`: one session per link carrying IPv4 (RFC 8950 IPv6 next hops) and IPv6 | `autodiscover.sh` peers with the gateway of the lowest-metric default route that is up: one session per family, to one leaf |
+| Routes from the fabric | default route, installed, ECMP over both leafs | default route, not installed (Cilium installs nothing); the node forwards on its kernel default |
+| Leaf ports | routed `ethernet-1/10.0` / `1/11.0` in ipvrf-k8s, IPv6 RA | bridged into `macvrf-k8s` (no EVPN), `irb0.300` `10.30.<leaf>.1/24` |
+| Leaf dynamic neighbors | `dynamic-neighbors interface ethernet-1/10.0 peer-group k8s` | `dynamic-neighbors accept match 10.30.<leaf>.0/24 peer-group k8s-v4` (+ v6) |
+| Dual-homing | both leafs active | active/backup: the other leaf learns the node's routes via RT5 only |
+
+Common to all nodes (dummies in Linux VRF `k8s`, cluster AS 65100):
 
 | | |
 |---|---|
-| Racks | two nodes per leaf pair: k8s1/k8s2 on leaf1/leaf2, k8s3/k8s4 on leaf3/leaf4, k8s5/k8s6 on leaf5/leaf6 |
-| Cabling | `eth1` to the odd leaf, `eth2` to the even leaf (`ethernet-1/10` for odd nodes, `ethernet-1/11` for even), no LAG or ES |
-| Node subnet | leaf-local, not stretched: `10.30.<leaf>.0/24` and `3fff:10:30:<leaf>::/64` on `irb0.300` (gateway `.1`/`::1`) in `macvrf-k8s`, a MAC-VRF without EVPN. Node n is `.1n`/`::1n` on both leafs |
-| Pod CIDR | `10.244.<n>.0/24`, `3fff:244:0:<n>::/64` (gateway `.1`/`::1` on dummy `pods`) |
-| Anycast VIP | `10.200.0.100/32`, `3fff:200::100/128` on every node (dummy `vip`) |
-| Cluster AS | 65100 on all nodes; the leafs use 64512 in ipvrf-k8s |
-| IP-VRF | `ipvrf-k8s`, evi 3, VNI 3, `target:1:3`, `ecmp 128` |
+| Pod CIDR | `10.244.<n>.0/24`, `3fff:244:0:<n>::/64` (dummy `pods`) |
+| Node IP | `10.31.0.<n>/32`, `3fff:10:31::<n>/128` (dummy `node`) |
+| Anycast VIP | `10.200.0.100/32`, `3fff:200::100/128` (dummy `vip`) |
 
-Node side (`frr/k8s<n>/frr.conf`, all in Linux VRF `k8s`): peers with the irb address of both its leafs (its two default gateways), BFD, keepalive 3 s / hold 9 s and `timers connect 5`. The leafs are passive (dynamic neighbors), so the node's connect-retry sets how fast a session comes back. It advertises its own routes only (`OWN_ROUTES_ONLY`), and the kernel ECMPs the default route over both leafs.
+The node prefixes are advertised with `redistribute connected route-map NODE_PREFIXES` (match interface `pods`/`node`/`vip`), so `frr.conf` holds no node data: k8s1-k8s4 share one identical file and k8s5/k8s6 another. Outbound is limited to the node's own routes (`OWN_ROUTES_ONLY`). BFD, keepalive 3 s / hold 9 s and `timers connect 5` everywhere: the leafs only listen, so the node's connect-retry sets how fast a session comes back.
 
-Leaf side (`k8s/leaf/<leaf>.cfg`, also appended to `srl-configs/`), the same block on every leaf apart from the subnet:
-* `dynamic-neighbors accept match 10.30.<leaf>.0/24 peer-group k8s-v4 allowed-peer-as [ 65100 ]` and the IPv6 equivalent
-* `import-policy k8s-import`: only pod CIDRs (`10.244.0.0/16` /24-/26, `3fff:244::/32` /64) and VIPs (`10.200.0.0/16` /32, `3fff:200::/32` /128); `prefix-limit-received` 64
-* `export-policy k8s-export` rejects everything; the nodes get only `send-default-route`
-* `send-default-route export-policy k8s-default` (accept): without its own policy the leafs sent no default at all (25.10.5), even with 0/0 accepted in `k8s-export`
-* BFD on `irb0.300`, `failure-detection enable-bfd` and `fast-failover`; `multipath ebgp maximum-paths 16`
-* No vES and no GW-IP: every leaf a node is attached to has its own session, so remote leafs ECMP over both leafs of a rack through ordinary RT5s
+Leaf side (`ipvrf-k8s`, evi/VNI 3, `target:1:3`, `ecmp 128`; `k8s/leaf/<leaf>.cfg`, also in `srl-configs/`):
+* `import-policy k8s-import` accepts only pod CIDRs (`10.244.0.0/16` /24-/26, `3fff:244::/32` /64), node IPs (`10.31.0.0/24` /32, `3fff:10:31::/64` /128) and VIPs (`10.200.0.0/16` /32, `3fff:200::/32` /128); `prefix-limit-received` 64
+* `export-policy k8s-export` rejects everything; the nodes get only `send-default-route`, with `send-default-route export-policy k8s-default` (accept): without its own policy the leafs sent no default at all (25.10.5), even with 0/0 accepted in `k8s-export`
+* Unnumbered: `ip-forwarding receive-ipv4-check false` in ipvrf-k8s and `advertise-ipv6-next-hops` / `receive-ipv6-next-hops` on the group, for IPv4 over IPv6 next hops
+* No vES and no GW-IP
 
-`k8s/gen.py` writes both sides; regenerate and re-apply after changing the addressing. Spines are untouched.
+`k8s/gen.py` writes both sides (leaf configs, `frr/k8s<n>/`, `autodiscover.sh`). Spines are untouched.
 
 ### Test script
-`k8s/check.sh`: established dynamic peers per leaf, ECMP default on every node, leaf1's next hops for each pod CIDR and the VIP, a full mesh of pod-to-pod pings and VIP pings from every leaf, IPv4 and IPv6.
+`k8s/check.sh`: established dynamic peers per leaf (2 on leaf1-4, 4 on leaf5, 0 on leaf6), the default route on every node, the peers chosen on k8s5/k8s6, leaf1's next hops for every pod CIDR, node IP and the VIP, a full mesh of pod-to-pod pings and VIP pings from leaf5/leaf6, IPv4 and IPv6.
 
 ### Results (SR Linux 25.10.5)
-* All 24 sessions (6 nodes x 2 leafs x v4/v6) established with BFD; `check.sh` passes
-* Remote racks: leaf1 reaches k8s3's pod CIDR over leaf3 and leaf4 (ECMP)
-* The anycast VIP is ECMPed only over the local nodes on a leaf that has some: the local eBGP route wins over the RT5s. A leaf without nodes would ECMP over the RT5s of all six leafs (not tested, no such leaf)
-* Link failure k8s1 eth1 (leaf1) during a 20 pps stream from k8s6: no loss; IPv4 and IPv6 sessions back about 5-7 s after the link returns
+* `check.sh` passes
+* Racks 1-2: leaf3 reaches k8s1's pods over leaf1 and leaf2 (ECMP); k8s1 load-balances its default over both leafs' link-local addresses
+* Rack 3: both nodes peer with leaf5 only, so every leaf reaches them via leaf5, and leaf6 carries no k8s5/k8s6 routes while leaf5 is up
+* Leaf port of k8s1's eth1 (leaf1 `ethernet-1/10`) disabled and re-enabled during a 20 pps stream from k8s3's pods to k8s1's: no loss either way, IPv4 and IPv6
+* Leaf port of k8s5's eth1 (leaf5 `ethernet-1/10`) disabled during a 20 pps stream from k8s1 to k8s5's pods: 3.6 s gap until the session moves to leaf6 (2 s polling + session setup + RT5); re-enabled: 2.2 s gap, since the agent drops the leaf6 session before the leaf5 one is up, as a reconcile does
+* The anycast VIP is ECMPed only over the local nodes on a leaf that has some: the local eBGP route wins over the RT5s
 
 Lab notes:
-* Node exec sets `keep_addr_on_down=1` on `eth1`/`eth2`. Without it, `ip link set eth1 down` flushes the static IPv6 address, and the IPv6 session stays `Active` after the link comes back
+* Simulate link failures from the leaf (`admin-state disable` on the port): the node sees carrier loss. `ip link set ethX down` on the node deletes its IPv4 routes via that link and, unless `keep_addr_on_down=1` (set on k8s5/k8s6), its static IPv6 addresses, so the default routes don't come back
+* k8s5/k8s6 set `ignore_routes_with_linkdown=1`, so a default route over a dead link stops counting for `autodiscover.sh` (its log is `/var/log/autodiscover.log` on the node)
 * `accept_ra=0` on the node links, so the kernel doesn't source BGP from a SLAAC address (see the vm1 IPv6 note)

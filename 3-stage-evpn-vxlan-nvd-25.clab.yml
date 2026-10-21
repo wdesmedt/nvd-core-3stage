@@ -318,18 +318,12 @@ topology:
         - ip link add k8s type vrf table 130
         - ip link set k8s up
         - sysctl -w net.ipv6.conf.eth1.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
         - ip link set eth1 mtu 9000
         - ip link set eth1 master k8s
-        - ip addr add 10.30.1.11/24 dev eth1
-        - ip -6 addr add 3fff:10:30:1::11/64 dev eth1
         - ip link set eth1 up
         - sysctl -w net.ipv6.conf.eth2.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
         - ip link set eth2 mtu 9000
         - ip link set eth2 master k8s
-        - ip addr add 10.30.2.11/24 dev eth2
-        - ip -6 addr add 3fff:10:30:2::11/64 dev eth2
         - ip link set eth2 up
         - ip link add pods type dummy
         - ip link set pods master k8s
@@ -337,6 +331,11 @@ topology:
         - ip link set pods up
         - ip addr add 10.244.1.1/24 dev pods
         - ip -6 addr add 3fff:244:0:1::1/64 dev pods
+        - ip link add node type dummy
+        - ip link set node master k8s
+        - ip link set node up
+        - ip addr add 10.31.0.1/32 dev node
+        - ip -6 addr add 3fff:10:31::1/128 dev node
         - ip link add vip type dummy
         - ip link set vip master k8s
         - ip link set vip up
@@ -348,18 +347,12 @@ topology:
         - ip link add k8s type vrf table 130
         - ip link set k8s up
         - sysctl -w net.ipv6.conf.eth1.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
         - ip link set eth1 mtu 9000
         - ip link set eth1 master k8s
-        - ip addr add 10.30.1.12/24 dev eth1
-        - ip -6 addr add 3fff:10:30:1::12/64 dev eth1
         - ip link set eth1 up
         - sysctl -w net.ipv6.conf.eth2.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
         - ip link set eth2 mtu 9000
         - ip link set eth2 master k8s
-        - ip addr add 10.30.2.12/24 dev eth2
-        - ip -6 addr add 3fff:10:30:2::12/64 dev eth2
         - ip link set eth2 up
         - ip link add pods type dummy
         - ip link set pods master k8s
@@ -367,6 +360,11 @@ topology:
         - ip link set pods up
         - ip addr add 10.244.2.1/24 dev pods
         - ip -6 addr add 3fff:244:0:2::1/64 dev pods
+        - ip link add node type dummy
+        - ip link set node master k8s
+        - ip link set node up
+        - ip addr add 10.31.0.2/32 dev node
+        - ip -6 addr add 3fff:10:31::2/128 dev node
         - ip link add vip type dummy
         - ip link set vip master k8s
         - ip link set vip up
@@ -378,18 +376,12 @@ topology:
         - ip link add k8s type vrf table 130
         - ip link set k8s up
         - sysctl -w net.ipv6.conf.eth1.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
         - ip link set eth1 mtu 9000
         - ip link set eth1 master k8s
-        - ip addr add 10.30.3.13/24 dev eth1
-        - ip -6 addr add 3fff:10:30:3::13/64 dev eth1
         - ip link set eth1 up
         - sysctl -w net.ipv6.conf.eth2.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
         - ip link set eth2 mtu 9000
         - ip link set eth2 master k8s
-        - ip addr add 10.30.4.13/24 dev eth2
-        - ip -6 addr add 3fff:10:30:4::13/64 dev eth2
         - ip link set eth2 up
         - ip link add pods type dummy
         - ip link set pods master k8s
@@ -397,6 +389,11 @@ topology:
         - ip link set pods up
         - ip addr add 10.244.3.1/24 dev pods
         - ip -6 addr add 3fff:244:0:3::1/64 dev pods
+        - ip link add node type dummy
+        - ip link set node master k8s
+        - ip link set node up
+        - ip addr add 10.31.0.3/32 dev node
+        - ip -6 addr add 3fff:10:31::3/128 dev node
         - ip link add vip type dummy
         - ip link set vip master k8s
         - ip link set vip up
@@ -408,18 +405,12 @@ topology:
         - ip link add k8s type vrf table 130
         - ip link set k8s up
         - sysctl -w net.ipv6.conf.eth1.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
         - ip link set eth1 mtu 9000
         - ip link set eth1 master k8s
-        - ip addr add 10.30.3.14/24 dev eth1
-        - ip -6 addr add 3fff:10:30:3::14/64 dev eth1
         - ip link set eth1 up
         - sysctl -w net.ipv6.conf.eth2.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
         - ip link set eth2 mtu 9000
         - ip link set eth2 master k8s
-        - ip addr add 10.30.4.14/24 dev eth2
-        - ip -6 addr add 3fff:10:30:4::14/64 dev eth2
         - ip link set eth2 up
         - ip link add pods type dummy
         - ip link set pods master k8s
@@ -427,6 +418,11 @@ topology:
         - ip link set pods up
         - ip addr add 10.244.4.1/24 dev pods
         - ip -6 addr add 3fff:244:0:4::1/64 dev pods
+        - ip link add node type dummy
+        - ip link set node master k8s
+        - ip link set node up
+        - ip addr add 10.31.0.4/32 dev node
+        - ip -6 addr add 3fff:10:31::4/128 dev node
         - ip link add vip type dummy
         - ip link set vip master k8s
         - ip link set vip up
@@ -438,16 +434,20 @@ topology:
         - ip link add k8s type vrf table 130
         - ip link set k8s up
         - sysctl -w net.ipv6.conf.eth1.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
         - ip link set eth1 mtu 9000
         - ip link set eth1 master k8s
+        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
+        - sysctl -w net.ipv4.conf.eth1.ignore_routes_with_linkdown=1
+        - sysctl -w net.ipv6.conf.eth1.ignore_routes_with_linkdown=1
         - ip addr add 10.30.5.15/24 dev eth1
         - ip -6 addr add 3fff:10:30:5::15/64 dev eth1
         - ip link set eth1 up
         - sysctl -w net.ipv6.conf.eth2.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
         - ip link set eth2 mtu 9000
         - ip link set eth2 master k8s
+        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
+        - sysctl -w net.ipv4.conf.eth2.ignore_routes_with_linkdown=1
+        - sysctl -w net.ipv6.conf.eth2.ignore_routes_with_linkdown=1
         - ip addr add 10.30.6.15/24 dev eth2
         - ip -6 addr add 3fff:10:30:6::15/64 dev eth2
         - ip link set eth2 up
@@ -457,27 +457,41 @@ topology:
         - ip link set pods up
         - ip addr add 10.244.5.1/24 dev pods
         - ip -6 addr add 3fff:244:0:5::1/64 dev pods
+        - ip link add node type dummy
+        - ip link set node master k8s
+        - ip link set node up
+        - ip addr add 10.31.0.5/32 dev node
+        - ip -6 addr add 3fff:10:31::5/128 dev node
         - ip link add vip type dummy
         - ip link set vip master k8s
         - ip link set vip up
         - ip addr add 10.200.0.100/32 dev vip
         - ip -6 addr add 3fff:200::100/128 dev vip
+        - ip route add default vrf k8s via 10.30.5.1 dev eth1 metric 100
+        - ip route add default vrf k8s via 10.30.6.1 dev eth2 metric 200
+        - ip -6 route add default vrf k8s via 3fff:10:30:5::1 dev eth1 metric 100
+        - ip -6 route add default vrf k8s via 3fff:10:30:6::1 dev eth2 metric 200
+        - 'sh -c "setsid /etc/frr/autodiscover.sh > /var/log/autodiscover.log 2>&1 < /dev/null &"'
     k8s6:
       group: frr
       exec:
         - ip link add k8s type vrf table 130
         - ip link set k8s up
         - sysctl -w net.ipv6.conf.eth1.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
         - ip link set eth1 mtu 9000
         - ip link set eth1 master k8s
+        - sysctl -w net.ipv6.conf.eth1.keep_addr_on_down=1
+        - sysctl -w net.ipv4.conf.eth1.ignore_routes_with_linkdown=1
+        - sysctl -w net.ipv6.conf.eth1.ignore_routes_with_linkdown=1
         - ip addr add 10.30.5.16/24 dev eth1
         - ip -6 addr add 3fff:10:30:5::16/64 dev eth1
         - ip link set eth1 up
         - sysctl -w net.ipv6.conf.eth2.accept_ra=0
-        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
         - ip link set eth2 mtu 9000
         - ip link set eth2 master k8s
+        - sysctl -w net.ipv6.conf.eth2.keep_addr_on_down=1
+        - sysctl -w net.ipv4.conf.eth2.ignore_routes_with_linkdown=1
+        - sysctl -w net.ipv6.conf.eth2.ignore_routes_with_linkdown=1
         - ip addr add 10.30.6.16/24 dev eth2
         - ip -6 addr add 3fff:10:30:6::16/64 dev eth2
         - ip link set eth2 up
@@ -487,12 +501,21 @@ topology:
         - ip link set pods up
         - ip addr add 10.244.6.1/24 dev pods
         - ip -6 addr add 3fff:244:0:6::1/64 dev pods
+        - ip link add node type dummy
+        - ip link set node master k8s
+        - ip link set node up
+        - ip addr add 10.31.0.6/32 dev node
+        - ip -6 addr add 3fff:10:31::6/128 dev node
         - ip link add vip type dummy
         - ip link set vip master k8s
         - ip link set vip up
         - ip addr add 10.200.0.100/32 dev vip
         - ip -6 addr add 3fff:200::100/128 dev vip
-
+        - ip route add default vrf k8s via 10.30.5.1 dev eth1 metric 100
+        - ip route add default vrf k8s via 10.30.6.1 dev eth2 metric 200
+        - ip -6 route add default vrf k8s via 3fff:10:30:5::1 dev eth1 metric 100
+        - ip -6 route add default vrf k8s via 3fff:10:30:6::1 dev eth2 metric 200
+        - 'sh -c "setsid /etc/frr/autodiscover.sh > /var/log/autodiscover.log 2>&1 < /dev/null &"'
   links:
     - endpoints: [ "spine1:ethernet-1/1", "leaf1:ethernet-1/29" ]
     - endpoints: [ "spine1:ethernet-1/2", "leaf2:ethernet-1/29" ]
